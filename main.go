@@ -1,9 +1,11 @@
 package main
 
 import (
-  "net/http"
+	"net/http"
 
-  "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+
+  "nestrm_api/models"
 )
 
 type person struct {
@@ -18,8 +20,7 @@ type album struct {
     Price  float64 `json:"price"`
 }
 var persons = []person{
-  {UUID: "3fdvbh4578e", Givenname: "Saihaan", Surname: "Syed"},
-  {UUID: "jhb436bhfbd", Givenname: "Ish", Surname: "Dur"},
+  {UUID: "3fdvbh4578e", Givenname: "Saihaan", Surname: "Syed"},  {UUID: "jhb436bhfbd", Givenname: "Ish", Surname: "Dur"},
   {UUID: "sdfgy4378wf", Givenname: "David", Surname: "Attenborough"},
 }
 // albums slice to seed record album data.
