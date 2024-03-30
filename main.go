@@ -25,7 +25,7 @@ func main()  {
   ginRouter := gin.Default()
   ginRouter.GET("/testPersons", getTestPersons)
 
-  ginRouter.GET("/persons/all", models.RepondGetPersons)
+  ginRouter.GET("/persons/all", models.RepondGetPersonAll)
 
   ginRouter.Run("localhost:8000")
 }
