@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-  "github.com/chester-hill-solutions/nesrm_api/models"
+	"github.com/chester-hill-solutions/nesrm_api/routes"
 )
 
 type testPerson struct {
@@ -25,7 +25,7 @@ func main()  {
   ginRouter := gin.Default()
   ginRouter.GET("/testPersons", getTestPersons)
 
-  ginRouter.GET("/persons/all", models.RepondGetPersonAll)
+  ginRouter.GET("/persons/all", routes.RespondGetPersonAll)
 
   ginRouter.Run("localhost:8000")
 }

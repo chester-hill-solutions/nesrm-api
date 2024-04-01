@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -39,7 +37,7 @@ func (p Person) toMap() map[string]string  {
 }
 
 //CREATE
-func newPerson(conn *pgxpool.Pool, legend map[string]string)  *Person{
+func NewPerson(conn *pgxpool.Pool, legend map[string]string)  *Person{
   birthdate, err := time.Parse("2006-01-02", legend["Birthdate"])
   if err!=nil {
     log.Print(err)
@@ -74,7 +72,7 @@ func newPerson(conn *pgxpool.Pool, legend map[string]string)  *Person{
   return &person
 }
 
-func personScanner(conn *pgxpool.Pool, row pgx.Row) (*Person, error) {
+func PersonFromRow(conn *pgxpool.Pool, row pgx.Row) (*Person, error) {
   startTime := time.Now()
   var UUID, Givenname, Surname, Bio_mother_UUID, Bio_father_UUID, Linkedin_link *string
   var Created_at, Birthdate, Deceased *time.Time
@@ -94,8 +92,8 @@ func personScanner(conn *pgxpool.Pool, row pgx.Row) (*Person, error) {
     "Linkedin_link":*stringNilCheck(Linkedin_link),
   }
 
-  person := newPerson(conn, m)
-  fmt.Println("personScanner: ", time.Now().Sub(startTime))
+  person := NewPerson(conn, m)
+  fmt.Println("PersonScanner: ", time.Now().Sub(startTime))
   return person, nil 
 }
 
@@ -103,46 +101,11 @@ func getPersonByUUID(conn *pgxpool.Pool, UUIDtoSearch string) (*Person, error) {
   startTime := time.Now()
   row := conn.QueryRow(context.Background(), "SELECT uuid, Created_at, givenname, surname, birthdate, deceased, bio_mother_uuid, bio_father_uuid, linkedin_link FROM person WHERE uuid=$1", UUIDtoSearch)
 
-  person, err := personScanner(conn, row)
+  person, err := PersonFromRow(conn, row)
   if err != nil{
     return nil, err
   }
 
   fmt.Println("getPersonByUUID: ", time.Now().Sub(startTime))
   return person, nil
-}
-
-func RepondGetPersonAll(c *gin.Context){
-  conn, err := Connection() 
-  if err != nil{
-    log.Fatal(err) 
-  }
-  defer conn.Close()
-  persons, err := getPersonAll(conn)
-  if err != nil {
-    log.Fatal(err)
-  }
-  c.IndentedJSON(http.StatusOK, persons) 
-}
-
-func getPersonAll(conn *pgxpool.Pool) (*[]Person, error) {
-  startTime := time.Now()
-  rows, err := conn.Query(context.Background(),"SELECT * FROM person")
-  if err != nil {
-    return nil, err
-  } 
-  defer rows.Close()
-  //r, err := pgx.CollectRows(rows, pgx.RowToStructByName[person])
-  persons := []Person{}
-  for rows.Next() {
-    person, err := personScanner(conn, rows) 
-    if err != nil {
-      //fmt.Printf("%+v\n", person)
-      log.Println(err) 
-    }
-    persons = append(persons, *person)
-  }
-  executionTime := time.Now().Sub(startTime)
-  fmt.Println("enter persons ended: ", executionTime)
-  return &persons, err
 }
