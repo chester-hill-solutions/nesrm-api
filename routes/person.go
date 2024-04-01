@@ -8,6 +8,7 @@ import (
 
 	"github.com/chester-hill-solutions/nesrm_api/models"
 	"github.com/chester-hill-solutions/nesrm_api/pgConnector"
+	"github.com/sai-sy/simplygolog"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,7 +36,7 @@ LEFT JOIN person as father ON base.bio_father_uuid = father.uuid;`)
   } 
   defer rows.Close()
   //r, err := pgx.CollectRows(rows, pgx.RowToStructByName[person])
-  log.Println(len(rows.FieldDescriptions()))
+  //log.Println(len(rows.FieldDescriptions()))
 
   //UNMARSHALL INTO STRUCTS
   persons := []models.Person{}
@@ -49,6 +50,7 @@ LEFT JOIN person as father ON base.bio_father_uuid = father.uuid;`)
   }
   executionTime := time.Now().Sub(startTime)
   log.Println("RespondGetPersonAll Execution Time: ", executionTime)
+  simplygolog.SaveTime("ResponsdGetPersonAll", executionTime)
   c.IndentedJSON(http.StatusOK, persons) 
 }
 

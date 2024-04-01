@@ -25,7 +25,8 @@ func main()  {
   ginRouter := gin.Default()
   ginRouter.GET("/testPersons", getTestPersons)
 
-  ginRouter.GET("/persons/all", routes.RespondGetPersonAll)
+  // /person
+  ginRouter.GET("/person/all", routes.RespondGetPersonAll)
 
   ginRouter.Run("localhost:8000")
 }

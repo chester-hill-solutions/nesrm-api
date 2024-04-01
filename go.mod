@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/joho/godotenv v1.5.1
+	github.com/sai-sy/simplygolog v0.0.0-20240401145132-877ddaa75bc2
 )
 
 require (
