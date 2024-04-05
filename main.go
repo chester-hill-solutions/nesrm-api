@@ -32,6 +32,7 @@ func main()  {
 
   // /organization
   router.GET("/organization/:UUID", routes.RespondGetOrganizationByUUID)
+  router.POST("/organization", routes.RespondPostOrganization)
 
   router.Run("localhost:8000")
 }

@@ -1,10 +1,7 @@
 package routes
 
-import (
-	"github.com/gin-gonic/gin"
-)
 
-func ValidateRequestContent(c *gin.Context) (bool, error) {
+func ValidateRequestContent(c map[string]interface{}) (bool, error) {
  return true, nil
 }
 

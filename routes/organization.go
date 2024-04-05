@@ -23,14 +23,20 @@ func RespondGetOrganizationByUUID(c *gin.Context){
   }
   defer connPool.Close()
   //Validate Request
-  requestIsValid, err := ValidateRequestContent(c)
+  var requestBodyMap map[string]interface{}
+  err = c.BindJSON(&requestBodyMap)
+  if err != nil {
+    c.IndentedJSON(http.StatusBadRequest, err)
+    return
+  }
+  requestIsValid, err := ValidateRequestContent(requestBodyMap)
   if requestIsValid == false{
     c.IndentedJSON(http.StatusUnprocessableEntity, err)
   }
 
   log.Println("enter responsd get organization by uuid")
   //Logic
-  organization, err := GetPersonByUUID(connPool, c.Param("UUID"))
+  organization, err := GetOrganizationByUUID(connPool, c.Param("UUID"))
   if err!=nil {
     c.IndentedJSON(http.StatusBadRequest, err)
     log.Println(err)
@@ -38,13 +44,16 @@ func RespondGetOrganizationByUUID(c *gin.Context){
     log.Println("org: ", organization)
     c.IndentedJSON(http.StatusOK, organization)
   }
-  simplygolog.SaveTime("RespondGetPerson", time.Since(startTime))
+  simplygolog.SaveTime("RespondGetOrganizationByUUID", time.Since(startTime))
 }
 
 func GetOrganizationByUUID(connPool *pgxpool.Pool, UUID string)  (*models.Organization, error){
   startTime := time.Now()
   log.Println("enter", UUID)
-  rows, err := connPool.Query(context.Background(), "SELECT * FROM organization WHERE uuid = $1", UUID)
+  args := pgx.NamedArgs{
+    "UUID":UUID,
+  }
+  rows, err := connPool.Query(context.Background(), "SELECT * FROM organization WHERE uuid = @UUID", args)
   if err != nil {
     return nil, err
   }
@@ -55,5 +64,62 @@ func GetOrganizationByUUID(connPool *pgxpool.Pool, UUID string)  (*models.Organi
   org := organizations[0]
   simplygolog.PrintSaveTime("GetOrganizationByUUID", time.Since(startTime))
   return &org, nil
-  
+}
+
+func RespondPostOrganization(c *gin.Context)  {
+  startTime := time.Now()
+  log.Println("Enter RespondPostOrganization")
+  //Connection
+  connPool, err := pgConnector.ConnectionPool()
+  if err != nil{
+    c.IndentedJSON(http.StatusInternalServerError, err)
+    return
+  }
+  defer connPool.Close()
+  //validate request content
+  var requestBodyMap map[string]interface{}
+  err = c.BindJSON(&requestBodyMap)
+  if err != nil {
+    c.IndentedJSON(http.StatusBadRequest, err)
+    return
+  }
+  requestIsValid, err := ValidateRequestContent(requestBodyMap)
+  if requestIsValid == false{
+    c.IndentedJSON(http.StatusUnprocessableEntity, err)
+    return
+  }
+
+  //unmarshall body into map
+  log.Println(requestBodyMap)
+  //Logic
+  organization, err := PostOrganization(connPool, requestBodyMap)
+  if err!=nil {
+    c.IndentedJSON(http.StatusBadRequest, err)
+    log.Println(err)
+    return
+  } else{
+    log.Println("org: ", organization)
+    c.IndentedJSON(http.StatusOK, organization)
+  }
+  simplygolog.PrintSaveTime("RespondPostOrganization", time.Since(startTime))
+}
+func PostOrganization(connPool *pgxpool.Pool, fields map[string]interface{}) (*models.Organization, error) {
+  startTime := time.Now()
+  log.Println("Enter PostOrganization")
+  organization, err := models.NewOrganization(fields)
+  if err != nil {
+    return nil, err
+  }
+  query := `INSERT INTO organization(name, linkedin_link) VALUES(@organizationName, @organizationLinkedin_link)`
+  args := pgx.NamedArgs{
+    "organizationName": organization.Name,
+    "organizationLinkedin_link":organization.Linkedin_link,
+  }
+  _, err = connPool.Exec(context.Background(), query, args)
+  if err!=nil {
+    log.Println(err)
+    return nil, err
+  }
+  simplygolog.PrintSaveTime("PostOrganization", time.Since(startTime))
+  return organization, nil
 }
