@@ -8,6 +8,8 @@ import (
 
 	//"github.com/jackc/pgx/v5/pgx"
 	//"github.com/jackc/pgx/v5"
+	pgxuuid "github.com/jackc/pgx-gofrs-uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -33,6 +35,14 @@ func ConnectionPool() (*pgxpool.Pool, error){
   q.Add("sslmode", "disable")
  dsn.RawQuery = q.Encode()
   //try and connPoolect
+  dbconfig, err := pgxpool.ParseConfig(dsn.String())
+  if err != nil {
+    return nil, err
+  }
+  dbconfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+    pgxuuid.Register(c.TypeMap())
+    return nil
+  }
   connPool, err := pgxpool.New(context.Background(), dsn.String())
   if err != nil{
     return nil, err
@@ -43,7 +53,7 @@ func ConnectionPool() (*pgxpool.Pool, error){
   return connPool, nil
 } 
 
-func TimeNilCheck(t *time.Time) *string{
+func TimeToString(t *time.Time) *string{
   if t == nil {
     s := ""
     p := &s
@@ -54,6 +64,15 @@ func TimeNilCheck(t *time.Time) *string{
     return p
   }
 }
+
+func TimeNilCheck(t *time.Time) *time.Time{
+  if t == nil {
+    r := time.Time{}
+    return &r
+  }
+  return t
+}
+
 
 func StringNilCheck(s *string) *string{
   if s == nil {

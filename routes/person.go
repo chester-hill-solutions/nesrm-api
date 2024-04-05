@@ -8,11 +8,150 @@ import (
 
 	"github.com/chester-hill-solutions/nesrm_api/models"
 	"github.com/chester-hill-solutions/nesrm_api/pgConnector"
-	"github.com/sai-sy/simplygolog"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sai-sy/simplygolog"
+  "github.com/gofrs/uuid/v5"
 )
+
+func RespondGetPersonByUUID(c *gin.Context){
+  log.Println("respond get person by UUID")
+  startTime := time.Now()
+  //Connection
+  connPool, err := pgConnector.ConnectionPool()
+  if err != nil {
+    log.Fatal(err)
+  }
+  defer connPool.Close()
+  
+  //Validate Request
+  requestIsValid, err := ValidateRequestContent(c)
+  if requestIsValid == false{
+    c.IndentedJSON(http.StatusUnprocessableEntity, err)
+  }
+
+  //Logic
+  persons, err := GetPersonByUUID(connPool, c.Param("UUID"))
+  if err!=nil {
+    c.IndentedJSON(http.StatusBadRequest, err)
+  }
+  c.IndentedJSON(http.StatusOK, persons)
+
+  simplygolog.SaveTime("RespondGetPerson", time.Since(startTime))
+}
+
+func GetPersonByUUID(connPool *pgxpool.Pool, UUID string) (*models.Person, error) {
+  log.Println("get person by uuid")
+  startTime := time.Now()
+  var _ []models.Person
+  _, err := uuid.FromString(UUID)
+  if err != nil {
+    return nil, err
+  }
+  rows, err := connPool.Query(context.Background(), `with recursive t as (
+  select 
+       p.uuid    as request_uuid,
+       p.uuid                 as uuid,
+       p.created_at           as created_at,
+       p.givenname            as givenname,
+       p.surname              as surname,
+       p.birthdate            as birthdate,
+       p.deceased             as deceased,
+       p.bio_mother_uuid      as bio_mother_uuid,
+       p.bio_father_uuid      as bio_father_uuid,
+       p.linkedin_link        as linkedin_link,
+       0 as generation
+       from person p
+  union all 
+  select 
+       child.request_uuid    as request_uuid,
+       p.uuid                 as uuid,
+       p.created_at           as created_at,
+       p.givenname            as givenname,
+       p.surname              as surname,
+       p.birthdate            as birthdate,
+       p.deceased             as deceased,
+       p.bio_mother_uuid      as bio_mother_uuid,
+       p.bio_father_uuid      as bio_father_uuid,
+       p.linkedin_link        as linkedin_link,
+       child.generation + 1 as generation       
+       from 
+       t child join 
+       person p on p.uuid = child.bio_mother_uuid or p.uuid = child.bio_father_uuid
+  )
+  select * from t where request_uuid = $1  and generation < 3`, UUID)
+  defer rows.Close()
+  if err != nil {
+    log.Println(err)
+    return nil, err
+  }
+  tree := make(map[string]*models.Person)
+  for rows.Next(){
+    person, err := RowToPerson(rows)
+    if err != nil {
+      log.Println(err)
+      return nil, err
+    }
+    tree[person.UUID] = person
+  }
+  person := models.BuildFromTree(tree, tree[UUID])
+  simplygolog.SaveTime("GetPersonByUUID", time.Since(startTime))
+  return &person, err
+}
+
+func RowToPerson(row pgx.Row) (*models.Person, error)  {
+  startTime := time.Now()
+  log.Println("Row To Person")
+  var request_UUID, base_UUID, base_givenname, base_surname, base_bio_mother_UUID, base_bio_father_UUID, base_linkedin_link *string
+  var base_generation *int
+
+  //var mother_UUID, mother_givenname, mother_surname, mother_bio_mother_UUID, mother_bio_father_UUID, mother_linkedin_link *string
+  //var father_UUID, father_givenname, father_surname, father_bio_mother_UUID, father_bio_father_UUID, father_linkedin_link *string
+  var base_created_at, base_birthdate, base_deceased *time.Time
+  //var mother_created_at, mother_birthdate, mother_deceased *time.Time
+  //var father_created_at, father_birthdate, father_deceased *time.Time
+  err := row.Scan(
+    &request_UUID, &base_UUID, &base_created_at, &base_givenname, &base_surname, &base_birthdate, &base_deceased, &base_bio_mother_UUID, &base_bio_father_UUID, &base_linkedin_link, &base_generation,
+    //&mother_UUID, &mother_created_at, &mother_givenname, &mother_surname, &mother_birthdate, &mother_deceased, &mother_bio_mother_UUID, &mother_bio_father_UUID, &mother_linkedin_link,
+    //&father_UUID, &father_created_at, &father_givenname, &father_surname, &father_birthdate, &father_deceased, &father_bio_mother_UUID, &father_bio_father_UUID, &father_linkedin_link,
+  )
+  if err!= nil {
+    return nil, err
+  }
+  var base_bio_father *models.Person
+  if base_bio_father_UUID == nil {
+    base_bio_father, _ = models.CreateNewPerson(make(map[string]interface{}))
+  } else {
+    f := map[string]interface{}{
+      "UUID":*base_bio_father_UUID,
+    }
+    base_bio_father, _ = models.CreateNewPerson(f) 
+  }
+  var base_bio_mother *models.Person
+  if base_bio_mother_UUID == nil {
+    base_bio_mother, _ = models.CreateNewPerson(make(map[string]interface{}))
+  } else {
+    f := map[string]interface{}{
+      "UUID":*base_bio_mother_UUID,
+    }
+    base_bio_mother, _ = models.CreateNewPerson(f) 
+  }
+  person := models.NewPerson(
+    *pgConnector.StringNilCheck(base_UUID),
+    *pgConnector.TimeNilCheck(base_created_at),
+    *pgConnector.StringNilCheck(base_givenname),
+    *pgConnector.StringNilCheck(base_surname),
+    *pgConnector.TimeNilCheck(base_birthdate),
+    *pgConnector.TimeNilCheck(base_deceased),
+    base_bio_mother,
+    base_bio_father,
+    *pgConnector.StringNilCheck(base_linkedin_link),
+
+    )
+  log.Println("Row to Person: ", time.Since(startTime).String())
+  return person, nil
+}
 
 func RespondGetPersonAll(c *gin.Context)  {
   log.Println("Responding GetPersonAll")
@@ -41,7 +180,7 @@ LEFT JOIN person as father ON base.bio_father_uuid = father.uuid;`)
   //UNMARSHALL INTO STRUCTS
   persons := []models.Person{}
   for rows.Next() {
-    person, err := PersonFromRow(connPool, rows) 
+    person, err := AdvPersonFromRow(connPool, rows) 
     if err != nil {
       //fmt.Printf("%+v\n", person)
       log.Println(err) 
@@ -54,7 +193,7 @@ LEFT JOIN person as father ON base.bio_father_uuid = father.uuid;`)
   c.IndentedJSON(http.StatusOK, persons) 
 }
 
-func PersonFromRow(connPool *pgxpool.Pool, row pgx.Row) (*models.Person, error) {
+func AdvPersonFromRow(connPool *pgxpool.Pool, row pgx.Row) (*models.Person, error) {
   startTime := time.Now()
   log.Println("enter PersonFromRow")
   var base_UUID, base_givenname, base_surname, base_bio_mother_UUID, base_bio_father_UUID, base_linkedin_link *string
@@ -73,35 +212,35 @@ func PersonFromRow(connPool *pgxpool.Pool, row pgx.Row) (*models.Person, error) 
   }
   m := map[string]string{
     "UUID":*base_UUID,
-    "Created_at":*pgConnector.TimeNilCheck(base_created_at),
+    "Created_at":*pgConnector.TimeToString(base_created_at),
     "Givenname":*base_givenname,
     "Surname":*base_surname,
-    "Birthdate":*pgConnector.TimeNilCheck(base_birthdate),
-    "Deceased":*pgConnector.TimeNilCheck(base_deceased),
+    "Birthdate":*pgConnector.TimeToString(base_birthdate),
+    "Deceased":*pgConnector.TimeToString(base_deceased),
     "Bio_mother_UUID":*pgConnector.StringNilCheck(base_bio_mother_UUID),
     "Bio_father_UUID":*pgConnector.StringNilCheck(base_bio_father_UUID),
     "Linkedin_link":*pgConnector.StringNilCheck(base_linkedin_link),
     "mother_UUID":*pgConnector.StringNilCheck(mother_UUID),
-    "mother_Created_at":*pgConnector.TimeNilCheck(mother_created_at),
+    "mother_Created_at":*pgConnector.TimeToString(mother_created_at),
     "mother_Givenname":*pgConnector.StringNilCheck(mother_givenname),
     "mother_Surname":*pgConnector.StringNilCheck(mother_surname),
-    "mother_Birthdate":*pgConnector.TimeNilCheck(mother_birthdate),
-    "mother_Deceased":*pgConnector.TimeNilCheck(mother_deceased),
+    "mother_Birthdate":*pgConnector.TimeToString(mother_birthdate),
+    "mother_Deceased":*pgConnector.TimeToString(mother_deceased),
     "mother_Bio_mother_UUID":*pgConnector.StringNilCheck(mother_bio_mother_UUID),
     "mother_Bio_father_UUID":*pgConnector.StringNilCheck(mother_bio_father_UUID),
     "mother_Linkedin_link":*pgConnector.StringNilCheck(mother_linkedin_link),
     "father_UUID":*pgConnector.StringNilCheck(father_UUID),
-    "father_Created_at":*pgConnector.TimeNilCheck(father_created_at),
+    "father_Created_at":*pgConnector.TimeToString(father_created_at),
     "father_Givenname":*pgConnector.StringNilCheck(father_givenname),
     "father_Surname":*pgConnector.StringNilCheck(father_surname),
-    "father_Birthdate":*pgConnector.TimeNilCheck(father_birthdate),
-    "father_Deceased":*pgConnector.TimeNilCheck(father_deceased),
+    "father_Birthdate":*pgConnector.TimeToString(father_birthdate),
+    "father_Deceased":*pgConnector.TimeToString(father_deceased),
     "father_Bio_mother_UUID":*pgConnector.StringNilCheck(father_bio_father_UUID),
     "father_Bio_father_UUID":*pgConnector.StringNilCheck(father_bio_father_UUID),
     "father_Linkedin_link":*pgConnector.StringNilCheck(father_linkedin_link),
   }
 
-  person := models.NewPerson(m)
+  person := models.AdvNewPerson(m)
   log.Println("PersonScanner: ", time.Now().Sub(startTime))
   return person, nil 
 }

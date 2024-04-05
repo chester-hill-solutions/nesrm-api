@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	r "github.com/gin-gonic/gin"
 
 	"github.com/chester-hill-solutions/nesrm_api/routes"
 )
@@ -17,16 +17,21 @@ var testPersons = []testPerson{
   {UUID: "3fdvbh4578e", Givenname: "Saihaan", Surname: "Syed"},  {UUID: "jhb436bhfbd", Givenname: "Ish", Surname: "Dur"},
   {UUID: "sdfgy4378wf", Givenname: "David", Surname: "Attenborough"},
 }
-func getTestPersons(c *gin.Context)  {
+func getTestPersons(c *r.Context)  {
   c.IndentedJSON(http.StatusOK, testPersons)
 }
 
 func main()  {
-  ginRouter := gin.Default()
-  ginRouter.GET("/testPersons", getTestPersons)
-
+  router := r.Default()
+  router.GET("/ping", func(ctx *r.Context) {
+    ctx.IndentedJSON(http.StatusOK, map[string]string{"Hello":"From Sai",})
+  })
   // /person
-  ginRouter.GET("/person/all", routes.RespondGetPersonAll)
+  router.GET("/person/all", routes.RespondGetPersonAll)
+  router.GET("/person/:UUID", routes.RespondGetPersonByUUID)
 
-  ginRouter.Run("localhost:8000")
+  // /organization
+  router.GET("/organization/:UUID", routes.RespondGetOrganizationByUUID)
+
+  router.Run("localhost:8000")
 }

@@ -38,7 +38,76 @@ func (p Person) toMap() map[string]string  {
 }
 
 //CREATE
-func NewPerson(legend map[string]string)  *Person{
+func CreateNewPerson(fields map[string]interface{}) (*Person, error){
+  person := Person{}
+  if len(fields) == 0 {
+    return nil, nil
+  }
+  UUID, ok := fields["UUID"]
+  if ok {
+    person.UUID = UUID.(string)
+  }
+  return &person, nil
+}
+
+
+func NewPerson(UUID string, Created_at time.Time, Givenname string, Surname string, Birthdate time.Time, Deceased time.Time, Bio_mother *Person, Bio_father *Person, Linkedin_link string)  *Person{
+  person := Person{
+    UUID: UUID,
+    Created_at: Created_at,
+    Givenname: Givenname,
+    Surname: Surname,
+    Birthdate: Birthdate,
+    Deceased: Deceased,
+    Bio_mother: Bio_mother,
+    Bio_father: Bio_father,
+    Linkedin_link: Linkedin_link,
+  }
+  return &person
+}
+
+func BuildFromTree(tree map[string]*Person, base *Person) Person {
+  log.Println("BuildFromTree")
+  return buildFromTree(tree, base)
+}
+
+func buildFromTree(tree map[string]*Person, base *Person)  Person{ 
+  startTime := time.Now()
+  log.Println("buildFromTree")
+  log.Println("Building for: ", base.Givenname, base.Surname)
+  var mother, father *Person
+  var mok, fok bool
+  if base.Bio_mother != nil {
+    mother, mok = tree[base.Bio_mother.UUID]
+    log.Println("Mother for ", base.Givenname, " ", base.Surname, ": ", mother.Givenname, " ", mother.Surname)
+  } else {
+    log.Println("No mother for: ", base.Givenname)
+    mother, mok = nil, false
+  }
+  if base.Bio_father != nil {
+    father, fok = tree[base.Bio_father.UUID]
+    log.Println("father for ", base.Givenname, " ", base.Surname, ": ", father.Givenname, " ", father.Surname)
+  } else {
+    father, fok = nil, false
+    log.Println("No father for: ", base.Givenname)
+  }
+  changed := *base
+  if mok {
+    log.Println("Finding mother for: ", changed.Givenname)
+    p := buildFromTree(tree, mother)
+    changed.Bio_mother = &p
+  }
+  log.Println(base.Givenname, " father ok: ", fok)
+  if fok {
+    log.Println("Finding father for: ", changed.Givenname)
+    p := buildFromTree(tree, father)
+    changed.Bio_father = &p
+  }
+  log.Println("buildFromTree,", time.Since(startTime).String())
+  return changed
+}
+
+func AdvNewPerson(legend map[string]string)  *Person{
   parsedTimeValues := pgConnector.BulkTimeParser([]string{legend["Birthdate"], legend["Deceased"], legend["Created_at"], legend["mother_Birthdate"], legend["mother_Deceased"], legend["mother_Created_at"], legend["father_Birthdate"], legend["father_Deceased"], legend["father_Created_at"]})
   person := Person{
     UUID: legend["UUID"],
@@ -136,7 +205,7 @@ func PersonFromRow(conn *pgxpool.Pool, row pgx.Row) (*Person, error) {
 
 func GetPersonByUUID(conn *pgxpool.Pool, UUIDtoSearch string) (*Person, error) {
   startTime := time.Now()
-  row := conn.QueryRow(context.Background(), "SELECT uuid, Created_at, givenname, surname, birthdate, deceased, bio_mother_uuid, bio_father_uuid, linkedin_link FROM person WHERE uuid=$1", UUIDtoSearch)
+  row, err := conn.Query(context.Background(), "SELECT uuid, Created_at, givenname, surname, birthdate, deceased, bio_mother_uuid, bio_father_uuid, linkedin_link FROM person WHERE uuid=$1", UUIDtoSearch)
 
   person, err := PersonFromRow(conn, row)
   if err != nil{
