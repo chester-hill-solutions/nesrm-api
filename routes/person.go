@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -12,37 +13,47 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sai-sy/simplygolog"
-  "github.com/gofrs/uuid/v5"
 )
 
-func RespondGetPersonByUUID(c *gin.Context){
-  log.Println("respond get person by UUID")
+func HandleGetPersonByUUID(c *gin.Context){
   startTime := time.Now()
+  log.Println("HandleGetPersonByUUID")
   //Connection
   connPool, err := pgConnector.ConnectionPool()
   if err != nil {
-    log.Fatal(err)
-  }
-  defer connPool.Close()
-  
-  //Validate Request
-  var requestBodyMap map[string]interface{}
-  err = c.BindJSON(&requestBodyMap)
-  if err != nil {
-    c.IndentedJSON(http.StatusBadRequest, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusInternalServerError, err.Error())
     return
   }
+  defer connPool.Close()
+  //Validate Request
+  var requestBodyMap map[string]interface{}
+  err = c.ShouldBind(&requestBodyMap)
+  //if err != nil {
+  //  log.Println(err)
+  //  c.IndentedJSON(http.StatusBadRequest, err.Error())
+  //  return
+  //}
   requestIsValid, err := ValidateRequestContent(requestBodyMap)
   if requestIsValid == false{
-    c.IndentedJSON(http.StatusUnprocessableEntity, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
+    return
   }
 
   //Logic
-  persons, err := GetPersonByUUID(connPool, c.Param("UUID"))
+  person, err := GetPersonByUUID(connPool, c.Param("UUID"))
   if err!=nil {
-    c.IndentedJSON(http.StatusBadRequest, err)
+    if err.Error() == "No resources found" {
+      log.Println(err)
+      c.IndentedJSON(http.StatusNotFound, person)
+      return
+    }
+    log.Println("GetPersonByUUID err: ", err)
+    c.IndentedJSON(http.StatusBadRequest, err.Error())
+    return
   }
-  c.IndentedJSON(http.StatusOK, persons)
+  c.IndentedJSON(http.StatusOK, *person)
 
   simplygolog.SaveTime("RespondGetPerson", time.Since(startTime))
 }
@@ -50,11 +61,6 @@ func RespondGetPersonByUUID(c *gin.Context){
 func GetPersonByUUID(connPool *pgxpool.Pool, UUID string) (*models.Person, error) {
   log.Println("get person by uuid")
   startTime := time.Now()
-  var _ []models.Person
-  _, err := uuid.FromString(UUID)
-  if err != nil {
-    return nil, err
-  }
   rows, err := connPool.Query(context.Background(), `with recursive t as (
   select 
        p.uuid    as request_uuid,
@@ -89,17 +95,22 @@ func GetPersonByUUID(connPool *pgxpool.Pool, UUID string) (*models.Person, error
   select * from t where request_uuid = $1  and generation < 3`, UUID)
   defer rows.Close()
   if err != nil {
-    log.Println(err)
+    log.Println("Query error: ", err)
     return nil, err
   }
+  var rowCount int
   tree := make(map[string]*models.Person)
   for rows.Next(){
+    rowCount++
     person, err := RowToPerson(rows)
     if err != nil {
-      log.Println(err)
+      log.Println("Row To Person error: ", err)
       return nil, err
     }
     tree[person.UUID] = person
+  }
+  if rowCount == 0{
+    return nil, errors.New("No resources found")
   }
   person := models.BuildFromTree(tree, tree[UUID])
   simplygolog.SaveTime("GetPersonByUUID", time.Since(startTime))

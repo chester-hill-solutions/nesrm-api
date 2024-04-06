@@ -9,9 +9,11 @@ import (
 	//"github.com/jackc/pgx/v5/pgx"
 	//"github.com/jackc/pgx/v5"
 	pgxuuid "github.com/jackc/pgx-gofrs-uuid"
+	pgxdecimal "github.com/jackc/pgx-shopspring-decimal"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 )
 
 
@@ -41,6 +43,7 @@ func ConnectionPool() (*pgxpool.Pool, error){
   }
   dbconfig.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
     pgxuuid.Register(c.TypeMap())
+    pgxdecimal.Register(c.TypeMap())
     return nil
   }
   connPool, err := pgxpool.New(context.Background(), dsn.String())
@@ -73,6 +76,13 @@ func TimeNilCheck(t *time.Time) *time.Time{
   return t
 }
 
+func DecimalNilCheck(d *decimal.Decimal) *decimal.Decimal{
+ if d == nil {
+    d := decimal.Decimal{}
+    return &d
+  } 
+  return d
+}
 
 func StringNilCheck(s *string) *string{
   if s == nil {

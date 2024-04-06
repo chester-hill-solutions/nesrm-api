@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 
 	r "github.com/gin-gonic/gin"
 
@@ -28,11 +29,18 @@ func main()  {
   })
   // /person
   router.GET("/person/all", routes.RespondGetPersonAll)
-  router.GET("/person/:UUID", routes.RespondGetPersonByUUID)
+  router.GET("/person/:UUID", routes.HandleGetPersonByUUID)
 
   // /organization
-  router.GET("/organization/:UUID", routes.RespondGetOrganizationByUUID)
-  router.POST("/organization", routes.RespondPostOrganization)
+  router.GET("/organization/:UUID", routes.HandleGetOrganizationByUUID)
+  router.POST("/organization", routes.HandlePostOrganization)
 
-  router.Run("localhost:8000")
+  // /campaign
+  router.GET("/campaign/:UUID", routes.HandleGetCampaignByUUID)
+
+  port := os.Getenv("PORT")
+  if port == ""{
+    port = "8080"
+  }
+  router.Run("127.0.0.1:"+port)
 }

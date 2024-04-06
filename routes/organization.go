@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -14,37 +15,46 @@ import (
 	"github.com/sai-sy/simplygolog"
 )
 
-func RespondGetOrganizationByUUID(c *gin.Context){
+func HandleGetOrganizationByUUID(c *gin.Context){
   startTime := time.Now()
+  log.Println("HandleGetOrganizationByUUID")
   //Connection
   connPool, err := pgConnector.ConnectionPool()
   if err != nil {
-    log.Fatal(err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusInternalServerError, err.Error())
+    return
   }
   defer connPool.Close()
   //Validate Request
   var requestBodyMap map[string]interface{}
-  err = c.BindJSON(&requestBodyMap)
-  if err != nil {
-    c.IndentedJSON(http.StatusBadRequest, err)
-    return
-  }
+  err = c.ShouldBind(&requestBodyMap)
+  //if err != nil {
+  //  log.Println(err)
+  //  c.IndentedJSON(http.StatusBadRequest, err.Error())
+  //  return
+  //}
   requestIsValid, err := ValidateRequestContent(requestBodyMap)
   if requestIsValid == false{
     c.IndentedJSON(http.StatusUnprocessableEntity, err)
   }
 
-  log.Println("enter responsd get organization by uuid")
   //Logic
   organization, err := GetOrganizationByUUID(connPool, c.Param("UUID"))
   if err!=nil {
-    c.IndentedJSON(http.StatusBadRequest, err)
+    if err.Error() == "No resources found" {
+      log.Println(err)
+      c.IndentedJSON(http.StatusNotFound, organization)
+      return
+    }
+    c.IndentedJSON(http.StatusBadRequest, err.Error())
     log.Println(err)
+    return
   } else{
     log.Println("org: ", organization)
     c.IndentedJSON(http.StatusOK, organization)
   }
-  simplygolog.SaveTime("RespondGetOrganizationByUUID", time.Since(startTime))
+  simplygolog.SaveTime("HandleGetOrganizationByUUIDGetOrganizationByUUID", time.Since(startTime))
 }
 
 func GetOrganizationByUUID(connPool *pgxpool.Pool, UUID string)  (*models.Organization, error){
@@ -55,42 +65,47 @@ func GetOrganizationByUUID(connPool *pgxpool.Pool, UUID string)  (*models.Organi
   }
   rows, err := connPool.Query(context.Background(), "SELECT * FROM organization WHERE uuid = @UUID", args)
   if err != nil {
+    log.Println("Query err:", err)
     return nil, err
   }
   organizations, err := pgx.CollectRows(rows, pgx.RowToStructByName[models.Organization])
   if err != nil {
     return nil, err
   }
+  if len(organizations) == 0{
+    return nil, errors.New("No resources found")
+  }
   org := organizations[0]
   simplygolog.PrintSaveTime("GetOrganizationByUUID", time.Since(startTime))
   return &org, nil
 }
 
-func RespondPostOrganization(c *gin.Context)  {
+func HandlePostOrganization(c *gin.Context)  {
   startTime := time.Now()
-  log.Println("Enter RespondPostOrganization")
+  log.Println("Enter HandlePostOrganization")
   //Connection
   connPool, err := pgConnector.ConnectionPool()
   if err != nil{
-    c.IndentedJSON(http.StatusInternalServerError, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusInternalServerError, err.Error())
     return
   }
   defer connPool.Close()
   //validate request content
   var requestBodyMap map[string]interface{}
-  err = c.BindJSON(&requestBodyMap)
+  err = c.ShouldBind(&requestBodyMap)
   if err != nil {
-    c.IndentedJSON(http.StatusBadRequest, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusBadRequest, err.Error())
     return
   }
   requestIsValid, err := ValidateRequestContent(requestBodyMap)
   if requestIsValid == false{
-    c.IndentedJSON(http.StatusUnprocessableEntity, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
     return
   }
 
-  //unmarshall body into map
-  log.Println(requestBodyMap)
   //Logic
   organization, err := PostOrganization(connPool, requestBodyMap)
   if err!=nil {
@@ -101,7 +116,7 @@ func RespondPostOrganization(c *gin.Context)  {
     log.Println("org: ", organization)
     c.IndentedJSON(http.StatusOK, organization)
   }
-  simplygolog.PrintSaveTime("RespondPostOrganization", time.Since(startTime))
+  simplygolog.PrintSaveTime("HandlePostOrganization", time.Since(startTime))
 }
 func PostOrganization(connPool *pgxpool.Pool, fields map[string]interface{}) (*models.Organization, error) {
   startTime := time.Now()
