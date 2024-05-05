@@ -27,16 +27,12 @@ func HandleGetOrganizationByUUID(c *gin.Context){
   }
   defer connPool.Close()
   //Validate Request
-  var requestBodyMap map[string]interface{}
-  err = c.ShouldBind(&requestBodyMap)
-  //if err != nil {
-  //  log.Println(err)
-  //  c.IndentedJSON(http.StatusBadRequest, err.Error())
-  //  return
-  //}
-  requestIsValid, err := ValidateRequestContent(requestBodyMap)
+  headers := c.Request.Header
+  requestIsValid, err := ValidateRequestContent(headers)
   if requestIsValid == false{
-    c.IndentedJSON(http.StatusUnprocessableEntity, err)
+    log.Println(err)
+    c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
+    return
   }
 
   //Logic
@@ -91,7 +87,14 @@ func HandlePostOrganization(c *gin.Context)  {
     return
   }
   defer connPool.Close()
-  //validate request content
+  //Validate Request
+  headers := c.Request.Header
+  requestIsValid, err := ValidateRequestContent(headers)
+  if requestIsValid == false{
+    log.Println(err)
+    c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
+    return
+  }
   var requestBodyMap map[string]interface{}
   err = c.ShouldBind(&requestBodyMap)
   if err != nil {
@@ -99,13 +102,6 @@ func HandlePostOrganization(c *gin.Context)  {
     c.IndentedJSON(http.StatusBadRequest, err.Error())
     return
   }
-  requestIsValid, err := ValidateRequestContent(requestBodyMap)
-  if requestIsValid == false{
-    log.Println(err)
-    c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
-    return
-  }
-
   //Logic
   organization, err := PostOrganization(connPool, requestBodyMap)
   if err!=nil {

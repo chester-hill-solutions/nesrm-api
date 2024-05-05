@@ -26,13 +26,13 @@ func HandleGetCampaignByUUID(c *gin.Context)  {
     return
   }
   defer connPool.Close()
-  //Valuidte Request
-  var requestBodyMap map[string]interface{}
-  err = c.ShouldBind(&requestBodyMap)
-  requestIsValid, err := ValidateRequestContent(requestBodyMap)
-  if !requestIsValid {
+  //Validate Request
+  headers := c.Request.Header
+  requestIsValid, err := ValidateRequestContent(headers)
+  if requestIsValid == false{
     log.Println(err)
     c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())
+    return
   }
 
   //Logic

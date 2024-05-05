@@ -1,8 +1,19 @@
 package routes
 
+import (
+	"errors"
+	"log"
+	"net/http"
+)
 
-func ValidateRequestContent(c map[string]interface{}) (bool, error) {
- return true, nil
+
+func ValidateRequestContent(headers http.Header ) (bool, error) {
+  if (len(headers["User"])>0)&&(len(headers["Service"])>0) {
+    log.Println("Request Validated")
+    return true, nil
+  } else {
+    return false, errors.New("Missing required headers: please include the user and the service this request is for")
+  }
 }
 
 func WHERE(params map[string]interface{}) string{

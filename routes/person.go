@@ -27,14 +27,8 @@ func HandleGetPersonByUUID(c *gin.Context){
   }
   defer connPool.Close()
   //Validate Request
-  var requestBodyMap map[string]interface{}
-  err = c.ShouldBind(&requestBodyMap)
-  //if err != nil {
-  //  log.Println(err)
-  //  c.IndentedJSON(http.StatusBadRequest, err.Error())
-  //  return
-  //}
-  requestIsValid, err := ValidateRequestContent(requestBodyMap)
+  headers := c.Request.Header
+  requestIsValid, err := ValidateRequestContent(headers)
   if requestIsValid == false{
     log.Println(err)
     c.IndentedJSON(http.StatusUnprocessableEntity, err.Error())

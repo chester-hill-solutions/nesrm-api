@@ -11,16 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Person struct{
-  UUID string
-  Created_at time.Time
-  Givenname string
-  Surname string
-  Birthdate time.Time
-  Deceased time.Time
-  Bio_mother *Person
-  Bio_father *Person
-  Linkedin_link string
+type Person struct {
+	UUID          string    `json:"uuid"`
+	Created_at    time.Time `json:"created_at"`
+	Givenname     string    `json:"givenname"`
+	Surname       string    `json:"surname"`
+	Birthdate     time.Time `json:"birthdate"`
+	Deceased      time.Time `json:"deceased"`
+	Bio_mother    *Person   `json:"bio_mother"`
+	Bio_father    *Person   `json:"bio_father"`
+	Linkedin_link string    `json:"linkedin_link"`
 }
 
 func (p Person) toMap() map[string]string  {
